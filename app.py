@@ -1,52 +1,54 @@
 from flask import Flask, request, jsonify
-from datetime import datetime, timedelta
+import heapq
+import time
 
 app = Flask(__name__)
 
-vehicles = []
-tasks = []
+# Priority Queue (Min Heap)
+vehicle_heap = []
 
-# Home route (check server)
-@app.route('/')
-def home():
-    return "Vehicle Maintenance Scheduler Running"
+# Priority logic
+def get_priority(vehicle_type):
+    if vehicle_type == "Emergency":
+        return 3
+    elif vehicle_type == "Medical":
+        return 2
+    else:
+        return 1
 
-# Add Vehicle
+# Add vehicle
 @app.route('/add_vehicle', methods=['POST'])
 def add_vehicle():
     data = request.json
-    vehicles.append(data)
+    
+    vehicle_type = data.get("type")
+    number = data.get("number")
+    
+    priority = get_priority(vehicle_type)
+    timestamp = time.time()
+    
+    heapq.heappush(vehicle_heap, (-priority, timestamp, number, vehicle_type))
+    
     return jsonify({"message": "Vehicle added successfully"})
 
-# Add Task
-@app.route('/add_task', methods=['POST'])
-def add_task():
-    data = request.json
-    tasks.append(data)
-    return jsonify({"message": "Task added successfully"})
-
-# Check Schedule
-@app.route('/schedule', methods=['GET'])
-def schedule():
-    today = datetime.now()
+# Get top vehicles
+@app.route('/get_vehicles', methods=['GET'])
+def get_vehicles():
     result = []
-
-    for v in vehicles:
-        last_date = datetime.strptime(v['last_service_date'], "%Y-%m-%d")
-
-        for t in tasks:
-            next_service = last_date + timedelta(days=t['interval_days'])
-
-            if next_service <= today:
-                result.append({
-                    "vehicle_id": v['vehicle_id'],
-                    "task": t['task_name'],
-                    "status": "Due"
-                })
-
+    temp = vehicle_heap.copy()
+    
+    while temp:
+        item = heapq.heappop(temp)
+        result.append({
+            "number": item[2],
+            "type": item[3]
+        })
+    
     return jsonify(result)
 
-# Run server
+@app.route('/')
+def home():
+    return "Vehicle Scheduler Running"
+
 if __name__ == '__main__':
     app.run(debug=True)
-    
